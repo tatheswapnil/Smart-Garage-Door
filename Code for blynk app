@@ -1,0 +1,208 @@
+IMPLEMENTATION: 
+#define BLYNK_PRINT Serial
+#include <ESP8266WiFi.h>
+#include <BlynkSim
+pleEsp8266.h>
+#include <Servo.h>
+#define LED 0 //On board LED
+#define BUZZER 4
+BlynkTimer timer;
+// You should get Auth Token in the Blynk App.
+// Go to the Project Settings (nut icon).
+char auth[] = "9f1ffc9b67884cc5951759d000f116c6";
+// Your WiFi credentials.
+// Set password to "" for open networks.
+char ssid[] = "soms";
+char pass[] = "sunny007";
+int isDoorOpen=0;
+String lockstate = "GATE CLOSED";
+String lightstate = "LIGHT OFF";
+int islightOn=0;
+int notificationCounter=0;
+Servo myservo;
+int pos = 0;
+WidgetLCD lcd(V5);
+WidgetLED led1(V3);
+/* Reads button in the Blynk app and writes (locks and Unlock door) */
+BLYNK_WRITE(V0)
+{
+Serial.println("In Blynk_Write for door lock unlock");
+int state = param.asInt();
+Serial.println(state);
+Serial.println(isDoorOpen);
+if( state ==1 && isDoorOpen==1)
+{
+//digitalWrite(LED,HIGH); //LED OFF
+//lightstate=0;
+//Lock
+if (pos != 110){
+Serial.println("OUT");
+for (pos = 0; pos < 110; pos += 1){
+myservo.write(pos);
+delay(20);
+}}
+digitalWrite(BUZZER,LOW);
+lockstate = "GATE CLOSED";
+lcd.clear();
+lcd.print(4,0,lightstate);
+lcd.print(4,1,lockstate);
+isDoorOpen=0;
+Blynk.virtualWrite(V1, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+Blynk.virtualWrite(V1, "Garage gate Closed");
+Serial.println("Garage gate Closed");
+notificationCounter=0;
+}
+else if( state ==0 && isDoorOpen==0)
+{
+digitalWrite(LED,HIGH); //LED ON
+led1.on();
+islightOn=1;
+lightstate = "LIGHT ON";
+Blynk.virtualWrite(V2,1);
+//Unlock
+if (pos != 0){
+Serial.println("IN");
+for (pos = 110; pos > 0; pos -= 1){
+myservo.write(pos);
+delay(20);
+}}
+isDoorOpen=1;
+lockstate = "GATE OPEN";
+lcd.clear();
+lcd.print(4,0,lightstate);
+lcd.print(4,1,lockstate);
+Blynk.virtualWrite(V1, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+Blynk.virtualWrite(V1, "Garage gate Opened");
+Serial.println("Garage Gate Opened");
+}
+else
+{
+String currentmsg="GARAGE is already in "+lockstate+" State.
+Unnecesarry Action so no State change";
+Blynk.virtualWrite(V1, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+Blynk.virtualWrite(V1, currentmsg);
+Serial.print("GARAGE is already in ");
+Serial.print(lockstate);
+Serial.println(" State");
+Serial.println("Unnecessary Action so no State change");
+}
+}
+/* Reads button in the Blynk app and writes (light on off) */
+BLYNK_WRITE(V2)
+{
+Serial.println("In Blynk_Write for light on off");
+int state = param.asInt();
+Serial.println(state);
+Serial.println(islightOn);
+if( state ==1 && islightOn==0)
+{
+digitalWrite(LED,HIGH); //LED ON
+led1.on();
+lightstate = "LIGHT ON";
+islightOn=1;
+lcd.clear();
+lcd.print(4,0,lightstate);
+lcd.print(4,1,lockstate);
+}
+else if( state ==0 && islightOn==1)
+{
+digitalWrite(LED,LOW); //LED OFF
+led1.off();
+lightstate = "LIGHT OFF";
+islightOn=0;
+lcd.clear();
+lcd.print(4,0,lightstate);
+lcd.print(4,1,lockstate);
+}
+else
+{
+String currentmsg="GARAGE is already in "+lightstate+" State.
+Unnecesarry Action so no State change";
+Blynk.virtualWrite(V1, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+Blynk.virtualWrite(V1, currentmsg);
+Serial.print("GARAGE is already in ");
+Serial.print(lightstate);
+Serial.println(" State");
+Serial.println("Unnecessary Action so no State change");
+}
+}
+void notifyOndooropen()
+{
+if (isDoorOpen==1) {
+notificationCounter++;
+Serial.println("Someone Opened the GARAGE GATE");
+// We allow 1 notification per 15 seconds for now.
+Blynk.virtualWrite(V1, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+// Blynk.virtualWrite(V1, "Alert : Someone has kept the door open .Please
+close it");
+
+String ans=(String)"GARAGE GATE is kept open for "+
+(notificationCounter*15)+ (String)(" seconds. Please close it .");
+Serial.println(ans);
+Blynk.virtualWrite(V1, ans);
+Blynk.notify(ans);
+if((notificationCounter*15)>150)
+{
+digitalWrite(BUZZER,HIGH);
+Serial.println("sending Alert Mail");
+Blynk.email( "Smart Garage Alert", ans);
+}
+//notificationCounter++;
+/* if(notificationCounter>=5)
+{
+randNumber = random(300);
+String ans=(String)"Door is kept open for "+ (notificationCounter*15)+
+(String)(" seconds. Please close it . [")+randNumber+(String)"]";
+Serial.println(ans);
+//Blynk.tweet("Door kept Open for more than a minute.Please check");
+}*/
+}
+else
+{
+//Blynk.virtualWrite(V1, "Door is closed no action");
+notificationCounter=0;
+Serial.println("GARAGE GATE is closed no action");
+}
+}
+void setup()
+{
+// Debug console
+Serial.begin(9600);
+Blynk.begin(auth, ssid, pass);
+// Setup notification button on pin D1
+pinMode(LED,OUTPUT);
+pinMode(BUZZER,OUTPUT);
+digitalWrite(BUZZER,LOW);
+digitalWrite(LED,LOW); //LED OFF
+led1.off();
+myservo.attach(5);//servo pin set
+delay(1000);
+islightOn=0;
+if (pos != 110){
+Blynk.virtualWrite(V1, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+Blynk.virtualWrite(V1, "Locking Garage gate intially and Garage Lights
+off");
+
+for (pos = 0; pos < 110; pos += 1){
+myservo.write(pos);
+delay(20);
+}
+Serial.println("Locking Door intially and Garage Lights Off");
+}
+delay(1000);
+isDoorOpen=0;
+lockstate = "GATE CLOSED";
+lightstate = "LIGHT OFF";
+//Blynk.virtualWrite(V0,1);
+//app Led
+//app door status
+lcd.clear();
+lcd.print(4,0,lightstate);
+lcd.print(4,1,lockstate);
+timer.setInterval(16000L,notifyOndooropen);
+}
+void loop()
+{
+Blynk.run();
+timer.run(); // Initiates BlynkTimer
+}
